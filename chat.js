@@ -1,5 +1,6 @@
 const API_URL = "https://hf-api.eligiolayna01.workers.dev";
 let PROMPT_BASE = "";
+let historial = []; // Memoria de la plática actual
 
 document.addEventListener("DOMContentLoaded", async () => {
     const input = document.getElementById("user-input");
@@ -15,7 +16,7 @@ async function cargarPrompt() {
         PROMPT_BASE = await r.text();
         setEstado("Sistema listo");
     } catch {
-        setEstado("Error cargando info.txt", true);
+        setEstado("Error info.txt", true);
     }
 }
 
@@ -24,22 +25,33 @@ async function enviarMensaje() {
     const texto = input.value.trim();
     if (!texto) return;
 
+    historial.push({ role: "user", content: texto });
     agregarMensaje(texto, "user-msg");
     input.value = "";
+
     const id = "bot_" + Date.now();
     agregarMensaje("...", "bot-msg", id);
+    setEstado("Pensando...");
 
     try {
         const r = await fetch(API_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ pregunta: texto, prompt: PROMPT_BASE })
+            body: JSON.stringify({ 
+                pregunta: texto, 
+                prompt: PROMPT_BASE,
+                historial: historial 
+            })
         });
         const data = await r.json();
-        // Convertimos el texto de la IA a HTML bonito
+        
+        historial.push({ role: "assistant", content: data.answer });
+        // Usar marked para convertir asteriscos en HTML
         document.getElementById(id).innerHTML = marked.parse(data.answer);
+        setEstado("Listo");
     } catch (e) {
         document.getElementById(id).innerText = "Error de conexión";
+        setEstado("Error", true);
     }
 }
 
@@ -48,7 +60,7 @@ function agregarMensaje(texto, clase, id = null) {
     const div = document.createElement("div");
     div.className = "msg " + clase;
     if (id) div.id = id;
-    div.innerHTML = id ? texto : texto; // Permitir HTML para el bot
+    div.innerHTML = texto; 
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
 }
